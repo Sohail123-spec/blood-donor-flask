@@ -2,6 +2,8 @@ from flask import Flask, render_template, request, redirect
 import sqlite3
 from datetime import datetime, timedelta
 from flask import Flask, render_template, request, redirect, session
+import pandas as pd
+import os
 
 app = Flask(__name__)
 app.secret_key = "secret123"
@@ -264,6 +266,45 @@ def request_blood():
         return redirect("/")
 
     return render_template("request.html")
+# ---------- UPLOAD EXCEL ----------
+@app.route("/upload_excel", methods=["GET", "POST"])
+def upload_excel():
+
+    if request.method == "POST":
+
+        file = request.files["file"]
+
+        if file:
+
+            filepath = os.path.join("uploads", file.filename)
+            file.save(filepath)
+
+            df = pd.read_excel(filepath)
+
+            conn = sqlite3.connect("database.db")
+            cursor = conn.cursor()
+
+            for index, row in df.iterrows():
+
+                cursor.execute("""
+                INSERT INTO donors
+                (name, blood_group, city, phone, last_donation, available)
+                VALUES (?, ?, ?, ?, ?, ?)
+                """, (
+                    row["name"],
+                    row["blood_group"],
+                    row["city"],
+                    str(row["phone"]),
+                    str(row["last_donation"]),
+                    row["available"]
+                ))
+
+            conn.commit()
+            conn.close()
+
+            return "Excel data uploaded successfully!"
+
+    return render_template("upload.html")
 # ---------- RUN SERVER ----------
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
